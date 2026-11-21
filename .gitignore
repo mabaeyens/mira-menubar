@@ -1,0 +1,61 @@
+# --- Local-only working files (never committed) ---------------------------
+# Claude Code guidance: dev-machine specific, may hold local paths. Copy it from
+# CLAUDE.md.template (see TEMPLATE.md); it stays local.
+CLAUDE.md
+.claude/
+
+# Pre-coding 5-bullet specs (see CONTRIBUTING.md). Local only, deleted once shipped.
+specs/
+
+# Personal investigation notes and deep-dives
+notes/
+
+# Security audit findings about this project's own code: never published
+SECURITY_AUDIT.md
+
+# Obsidian vault config and scratch files, if the folder is opened as a vault
+.obsidian/
+/Untitled*
+/20[0-9][0-9]-[0-9][0-9]-[0-9][0-9].md
+
+# --- OS / editors ----------------------------------------------------------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# --- Secrets and logs ------------------------------------------------------
+.env
+*.key
+*.pem
+*.log
+
+# --- Python (optional: delete if the project is not Python) ----------------
+__pycache__/
+*.py[cod]
+build/
+dist/
+*.egg-info/
+# Virtualenvs live OUTSIDE the tree at ~/.venvs/<project> and are symlinked in.
+# No trailing slash on .venv: a trailing slash matches a directory, not a symlink.
+.venv
+venv/
+ENV/
+.pytest_cache/
+
+# --- Swift / Xcode (optional: delete if the project is not Swift) ----------
+.build/
+.swiftpm/
+DerivedData/
+xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+*.moved-aside
+# App Store Connect credentials: commit *.plist.template, never the real plist
+ExportOptions-*.plist
+!ExportOptions-*.plist.template
+# TLS certificates and private keys
+certs/
+keys/
