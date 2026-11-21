@@ -71,6 +71,7 @@ final class AppModel: ObservableObject {
     func launch() {
         try? paths.createDirectories()
         startPolling()
+        startCertificateWatch()
         Task {
             let first = await client.snapshot()
             health = first
@@ -78,7 +79,9 @@ final class AppModel: ObservableObject {
             if first.reachable { return }  // started elsewhere: watch it, never touch it
             if layout == nil { return }
             switch SetupState.detect(paths: paths) {
-            case .ready: startServer()
+            case .ready:
+                await renewCertificateIfDue()  // before the server reads the certificate
+                startServer()
             case .needsSetup: showSetup()
             }
         }
@@ -209,6 +212,28 @@ final class AppModel: ObservableObject {
             }
             pairing.busy = false
             refreshPairing()
+        }
+    }
+
+    /// Tailscale certificates last 90 days and nothing renews them on its own. Renew at 60 days.
+    /// A failure (Tailscale down) is retried at the next check; the old certificate stays in use.
+    private func renewCertificateIfDue() async {
+        let remote = RemoteAccess(paths: paths)
+        guard canEditServerConfig, remote.certificateNeedsRenewal() else { return }
+        do {
+            try await remote.renewCertificate(using: tailscale)
+            if ownsServer { await supervisor?.restart() }  // the server reads the certificate at start
+        } catch {
+            NSLog("Mira: certificate renewal failed: %@", String(describing: error))
+        }
+    }
+
+    private func startCertificateWatch() {
+        Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 12 * 3600 * 1_000_000_000)
+                await self?.renewCertificateIfDue()
+            }
         }
     }
 
