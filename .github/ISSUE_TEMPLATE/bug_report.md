@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Something in {{PROJECT_NAME}} is broken
+about: Something in mira-menubar is broken
 title: ''
 labels: bug
 assignees: ''
@@ -33,7 +33,7 @@ repo's Security tab, "Report a vulnerability".
 
 - **OS version:**
 - **Hardware:**
-- **{{PROJECT_NAME}} version:** <!-- release tag, or `git rev-parse --short HEAD` -->
+- **mira-menubar version:** <!-- release tag, or `git rev-parse --short HEAD` -->
 - **Language / toolchain version:** <!-- python3 --version, or Xcode version -->
 
 ### Logs

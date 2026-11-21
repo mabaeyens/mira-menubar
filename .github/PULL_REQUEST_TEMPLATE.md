@@ -18,7 +18,7 @@
 
 ## Checklist
 
-- [ ] {{TEST_COMMAND}} passes / builds clean on the targets I touched
+- [ ] swift test passes / builds clean on the targets I touched
 - [ ] No secrets, API keys, or local config committed
 - [ ] User input validated; no `shell=True` (Python)
 - [ ] README / CHANGELOG updated if the change is user-facing

@@ -1,34 +1,52 @@
-# {{PROJECT_NAME}}
+# mira-menubar
 
-{{ONE_LINE_DESCRIPTION}}
+A macOS menu-bar app that installs, starts and supervises the Mira server, shipped as a notarized DMG.
 
 ## Description
 
-What it does and the problem it solves.
+Mira's server is a Python backend with an MLX inference engine. Installing it today means a
+terminal, `uv` and a checkout. This app removes that: download the DMG, drag it to
+Applications, open it. It embeds the runtime, starts and supervises the server, downloads the
+model on first run with progress, and keeps a status item in the menu bar (running, asleep,
+waking, stopped). The model unloads when idle and wakes on the next request.
+
+The Mac App Store apps (`mira-apps`) stay thin clients. A sandboxed Store app cannot run the
+server, which is why this one ships outside the Store as a Developer ID notarized DMG.
 
 ## Requirements
 
 Hard dependencies only.
 
-- {{REQUIREMENT, e.g. Python 3.13 or Xcode 26 / iOS 18+}}
+- macOS 14 or later on Apple silicon (the inference engine is MLX)
+- 16 GB RAM minimum, 32 GB for the default 35B model
+- About 25 GB free disk for the model
+- To build: Xcode 26 command line tools, `uv`, and a Developer ID Application certificate for signing
 
 ## Setup
 
+Use the app: download the latest DMG from Releases and drag Mira to Applications.
+
+Build from source:
+
 ```bash
-# copy-paste commands to get started
+git clone git@github.com:mabaeyens/mira-menubar.git
+cd mira-menubar
+swift build
 ```
 
 ## Usage
 
 ```bash
-# how to run it
+swift run MiraMenuBar        # development: runs the menu-bar app against a mira-core checkout
+scripts/build-app.sh         # assemble Mira.app with the embedded runtime (unsigned)
+scripts/release.sh           # sign, notarize, staple and build the DMG
 ```
 
 ## Development Workflow: Human-AI Collaboration
 
 This project is the result of a strategic collaboration between human design and AI-assisted code generation.
 
-- **Architecture & Logic:** Fully defined by the author ({{AUTHOR_NAME}}). This includes system structure, business rules, data flow, and implementation strategy.
+- **Architecture & Logic:** Fully defined by the author (Miguel A. Baeyens). This includes system structure, business rules, data flow, and implementation strategy.
 - **Code Generation:** The syntactic implementation and line-by-line code writing was performed by **Claude Code**, following precise and iterative instructions provided by the author.
 - **Supervision & Refinement:** All code was manually reviewed, tested, and adjusted to ensure quality, consistency, and compliance with project standards.
 

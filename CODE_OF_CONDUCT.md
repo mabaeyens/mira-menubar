@@ -20,8 +20,8 @@ political attacks, public or private harassment, and publishing others' private 
 ## Enforcement
 
 Report unacceptable behavior privately through the repository's
-[Security tab](https://github.com/{{GITHUB_USER}}/{{PROJECT_NAME}}/security) or to the maintainer,
-{{AUTHOR_NAME}}. Reports are reviewed promptly and fairly, and the reporter's privacy is respected.
+[Security tab](https://github.com/mabaeyens/mira-menubar/security) or to the maintainer,
+Miguel A. Baeyens. Reports are reviewed promptly and fairly, and the reporter's privacy is respected.
 
 ## Attribution
 

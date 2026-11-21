@@ -1,4 +1,4 @@
-# Contributing to {{PROJECT_NAME}}
+# Contributing to mira-menubar
 
 Thanks for the interest. This is a single-maintainer project, so response times vary.
 
@@ -9,20 +9,13 @@ Open an issue using the bug report template. Security vulnerabilities go through
 
 ## Prerequisites
 
-- {{e.g. Python 3.13 and uv   |   Xcode 26 and a recent macOS}}
+- Xcode 26 and macOS 14 or later, Apple silicon
 
 ## Setup
 
 ```bash
-# {{commands to get a working checkout}}
-```
-
-Python: keep the virtualenv outside the tree and symlink it in:
-
-```bash
-uv python pin 3.13
-UV_PROJECT_ENVIRONMENT="$HOME/.venvs/{{PROJECT_NAME}}" uv sync
-ln -sfn "$HOME/.venvs/{{PROJECT_NAME}}" .venv
+swift build
+swift test
 ```
 
 ## Workflow
@@ -45,7 +38,7 @@ ships and the durable detail is in README or docs.
 
 ## Before you open a pull request
 
-- [ ] {{TEST_COMMAND}} passes
+- [ ] swift test passes
 - [ ] No secrets, tokens or local config committed
 - [ ] User input validated; no `shell=True` (Python)
 - [ ] README / CHANGELOG updated if user-facing
