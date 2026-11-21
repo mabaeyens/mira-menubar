@@ -36,6 +36,9 @@ public struct AppPaths: Equatable, Sendable {
     }
 
     public var configFile: URL { appSupport.appendingPathComponent("mira.yaml") }
+    public var certsDir: URL { appSupport.appendingPathComponent("certs") }
+    public var certFile: URL { certsDir.appendingPathComponent("mira.crt") }
+    public var keyFile: URL { certsDir.appendingPathComponent("mira.key") }
     public var logsDir: URL { appSupport.appendingPathComponent("logs") }
     public var serverLog: URL { logsDir.appendingPathComponent("server.log") }
     public var setupLog: URL { logsDir.appendingPathComponent("setup.log") }
@@ -91,6 +94,13 @@ public struct RuntimeLayout: Equatable, Sendable {
         env["PYTHONUNBUFFERED"] = "1"
         env["MIRA_CONFIG"] = paths.configFile.path
         env["MIRA_DATA_DIR"] = paths.dataDir.path
+        // HTTPS for remote access: the server serves :8443 only when it has a certificate AND a token.
+        if FileManager.default.fileExists(atPath: paths.certFile.path),
+           FileManager.default.fileExists(atPath: paths.keyFile.path),
+           ConfigFile.value("auth_token", in: paths.configFile) != nil {
+            env["SSL_CERTFILE"] = paths.certFile.path
+            env["SSL_KEYFILE"] = paths.keyFile.path
+        }
         if paths.isIsolated {  // keep the child, and its Hugging Face cache, out of the real home too
             env["HOME"] = paths.home.path
             env["HF_HOME"] = paths.home.appendingPathComponent(".cache/huggingface").path

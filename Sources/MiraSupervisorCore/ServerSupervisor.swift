@@ -25,7 +25,9 @@ public final class ServerSupervisor: @unchecked Sendable {
     }
 
     private let queue = DispatchQueue(label: "mira.supervisor")
-    private let spec: SpawnSpec
+    /// Evaluated at every spawn, so a restart picks up configuration changed since the last start
+    /// (remote access adds a token and certificate to the server's environment).
+    private let makeSpec: @Sendable () -> SpawnSpec
     private let policy: Policy
     private var pid: pid_t = 0
     private var source: DispatchSourceProcess?
@@ -35,8 +37,12 @@ public final class ServerSupervisor: @unchecked Sendable {
     private var _state: SupervisorState = .stopped
     private var observers: [(SupervisorState) -> Void] = []
 
-    public init(spec: SpawnSpec, policy: Policy = Policy()) {
-        self.spec = spec
+    public convenience init(spec: SpawnSpec, policy: Policy = Policy()) {
+        self.init(specProvider: { spec }, policy: policy)
+    }
+
+    public init(specProvider: @escaping @Sendable () -> SpawnSpec, policy: Policy = Policy()) {
+        self.makeSpec = specProvider
         self.policy = policy
     }
 
@@ -93,7 +99,7 @@ public final class ServerSupervisor: @unchecked Sendable {
         guard pid == 0 else { return }
         set(.starting)
         do {
-            let p = try spawnInOwnGroup(spec)
+            let p = try spawnInOwnGroup(makeSpec())
             pid = p
             set(.running(pid: p))
             watch(p)

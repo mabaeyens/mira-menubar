@@ -45,6 +45,9 @@ struct MenuContent: View {
         }
 
         Divider()
+        if !model.status.external, model.runtimeProblem == nil {
+            Button("Pair iPhone…") { model.showPairing() }
+        }
         Toggle("Open at Login", isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
         Button("Show Logs") { model.revealLogs() }
         if UpdateController.shared.isAvailable {
@@ -117,4 +120,74 @@ final class SetupWindowController {
     }
 
     func close() { window?.close() }
+}
+
+// MARK: - Pairing
+
+struct PairingView: View {
+    @ObservedObject var model: AppModel
+    @State private var reveal = false
+
+    var body: some View {
+        let state = model.pairing
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Pair iPhone").font(.title2).bold()
+            if state.enabled, let payload = state.payload {
+                Text("Remote access is on. Mira is reachable only over your Tailscale network, with HTTPS.")
+                    .foregroundStyle(.secondary)
+                LabeledContent("Address") { Text(payload.url.absoluteString).textSelection(.enabled) }
+                LabeledContent("Token") {
+                    Text(reveal ? payload.token : String(repeating: "•", count: 16)).textSelection(.enabled)
+                        .font(.system(.body, design: .monospaced))
+                    Button(reveal ? "Hide" : "Show") { reveal.toggle() }.buttonStyle(.link)
+                }
+                Text("On the iPhone, open Mira, add a connection, and paste the link. The token is cleared from the clipboard after a minute.")
+                    .font(.callout).foregroundStyle(.secondary)
+                HStack {
+                    Button("Copy Link") { model.copyToPasteboard(payload.link) }.buttonStyle(.borderedProminent)
+                    Button("Copy Address") { model.copyToPasteboard(payload.url.absoluteString) }
+                    Button("Copy Token") { model.copyToPasteboard(payload.token) }
+                }
+                Divider()
+                HStack {
+                    Button("New Token…") { model.newPairingToken() }
+                    Button("Turn Off Remote Access") { model.setRemoteAccess(false) }
+                }
+                Text("A new token stops every paired device until it is paired again.")
+                    .font(.footnote).foregroundStyle(.secondary)
+            } else {
+                Text("Remote access is off. Mira listens on this Mac only, with no token.")
+                    .foregroundStyle(.secondary)
+                Text("Turning it on needs Tailscale, signed in, with HTTPS certificates enabled for your tailnet. Mira will create a token and a certificate and restart the server. There is no option to expose it on a plain local network.")
+                    .font(.callout).foregroundStyle(.secondary)
+                Button("Turn On Remote Access") { model.setRemoteAccess(true) }.buttonStyle(.borderedProminent)
+            }
+            if state.busy { ProgressView().controlSize(.small) }
+            if let message = state.message { Text(message).foregroundStyle(.red).font(.callout) }
+        }
+        .padding(20)
+        .frame(width: 460)
+        .disabled(state.busy)
+    }
+}
+
+@MainActor
+final class PairingWindowController {
+    private var window: NSWindow?
+    private let model: AppModel
+
+    init(model: AppModel) { self.model = model }
+
+    func show() {
+        if window == nil {
+            let w = NSWindow(contentViewController: NSHostingController(rootView: PairingView(model: model)))
+            w.title = "Pair iPhone"
+            w.styleMask = [.titled, .closable]
+            w.isReleasedWhenClosed = false
+            window = w
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        window?.center()
+        window?.makeKeyAndOrderFront(nil)
+    }
 }

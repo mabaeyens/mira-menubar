@@ -24,11 +24,14 @@ final class AppModel: ObservableObject {
     private var setupTask: Task<Void, Never>?
     private var pollTask: Task<Void, Never>?
     private var setupWindow: SetupWindowController?
+    private var pairingWindow: PairingWindowController?
+    private let tailscale: TailscaleCLI = SystemTailscale()
+    @Published private(set) var pairing = PairingState()
 
     private init() {
         layout = Self.discoverRuntime()
         if let layout {
-            supervisor = ServerSupervisor(spec: layout.serverSpec(paths: AppPaths.standard()))
+            supervisor = ServerSupervisor(specProvider: { layout.serverSpec(paths: AppPaths.standard()) })
             runtimeProblem = nil
         } else {
             supervisor = nil
@@ -152,6 +155,72 @@ final class AppModel: ObservableObject {
     func setLaunchAtLogin(_ on: Bool) {
         LoginItem.setEnabled(on)
         launchAtLogin = LoginItem.isEnabled
+    }
+
+    // MARK: - remote access and pairing
+
+    struct PairingState {
+        var enabled = false
+        var payload: PairingPayload?
+        var busy = false
+        var message: String?
+    }
+
+    func showPairing() {
+        refreshPairing()
+        if pairingWindow == nil { pairingWindow = PairingWindowController(model: self) }
+        pairingWindow?.show()
+    }
+
+    private func refreshPairing() {
+        let remote = RemoteAccess(paths: paths)
+        pairing.enabled = remote.isEnabled
+        pairing.payload = remote.payload(label: Host.current().localizedName)
+    }
+
+    /// Whether this app may change the server's configuration. A server started elsewhere keeps its own.
+    private var canEditServerConfig: Bool { !status.external && runtimeProblem == nil }
+
+    func setRemoteAccess(_ on: Bool) {
+        guard canEditServerConfig else {
+            pairing.message = "This server was started outside the app, so the app will not change its settings."
+            return
+        }
+        change { remote in
+            if on { try await remote.enable(using: self.tailscale) } else { try remote.disable() }
+        }
+    }
+
+    func newPairingToken() {
+        guard canEditServerConfig else { return }
+        change { try $0.rotateToken() }
+    }
+
+    /// Runs a configuration change, then restarts the server so it takes effect.
+    private func change(_ work: @escaping (RemoteAccess) async throws -> Void) {
+        pairing.busy = true
+        pairing.message = nil
+        Task {
+            do {
+                try await work(RemoteAccess(paths: paths))
+                if ownsServer { await supervisor?.restart() }
+            } catch {
+                pairing.message = (error as? RemoteAccessError)?.description ?? error.localizedDescription
+            }
+            pairing.busy = false
+            refreshPairing()
+        }
+    }
+
+    /// The token is on the clipboard only briefly: cleared after a minute unless something else was copied.
+    func copyToPasteboard(_ text: String) {
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.setString(text, forType: .string)
+        let count = pb.changeCount
+        DispatchQueue.main.asyncAfter(deadline: .now() + 60) {
+            if NSPasteboard.general.changeCount == count { NSPasteboard.general.clearContents() }
+        }
     }
 
     // MARK: - setup
