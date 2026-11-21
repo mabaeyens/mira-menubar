@@ -58,6 +58,16 @@ final class ConfigEditTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: u, encoding: .utf8), "model: x\n")
     }
 
+    func testBlockListValuesGoWithTheirKeyAndNewlinesAreRefused() throws {
+        let u = temp("backend: x\nallowed_hosts:\n  - old.ts.net\n  - other.ts.net\nmodel: /m\n")
+        try ConfigEdit.set("allowed_hosts", to: "[\"new.ts.net\"]", in: u)
+        XCTAssertEqual(try String(contentsOf: u, encoding: .utf8), "backend: x\nallowed_hosts: [\"new.ts.net\"]\nmodel: /m\n")
+        let v = temp("allowed_hosts:\n  - a\nmodel: /m\n")
+        try ConfigEdit.remove("allowed_hosts", in: v)
+        XCTAssertEqual(try String(contentsOf: v, encoding: .utf8), "model: /m\n")
+        XCTAssertThrowsError(try ConfigEdit.set("auth_token", to: "a\nevil: 1", in: u))
+    }
+
     func testTheFileIsOwnerOnlyBecauseItHoldsAToken() throws {
         let u = temp("model: x\n")
         try ConfigEdit.set("auth_token", to: "t", in: u)
@@ -160,6 +170,22 @@ final class RemoteAccessTests: XCTestCase {
         let env = layout.serverSpec(paths: p, base: [:]).environment
         XCTAssertEqual(env["SSL_CERTFILE"], p.certFile.path)
         XCTAssertEqual(env["SSL_KEYFILE"], p.keyFile.path)
+    }
+
+    func testAHostileTailscaleNameIsRefusedBeforeAnythingIsWritten() async throws {
+        let p = paths()
+        for bad in ["a\"]\nauth_token: x", "-flag.ts.net", "has space.ts.net", ""] {
+            let fake = FakeTailscale(result: .success(TailscaleStatus(running: true, dnsName: bad)))
+            do { try await RemoteAccess(paths: p).enable(using: fake); XCTFail("accepted \(bad)") } catch {}
+        }
+        XCTAssertNil(RemoteAccess(paths: p).token)
+    }
+
+    func testInheritedCertificateVariablesAreDroppedWhenRemoteAccessIsOff() {
+        let layout = RuntimeLayout(python: "/p", pythonHome: nil, pythonPath: [], coreDir: "/c")
+        let env = layout.serverSpec(paths: paths(), base: ["SSL_CERTFILE": "/x", "SSL_KEYFILE": "/y"]).environment
+        XCTAssertNil(env["SSL_CERTFILE"])
+        XCTAssertNil(env["SSL_KEYFILE"])
     }
 
     func testCertificateRenewalIsDueAfterSixtyDays() async throws {

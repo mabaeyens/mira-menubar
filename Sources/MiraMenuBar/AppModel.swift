@@ -242,6 +242,9 @@ final class AppModel: ObservableObject {
         let pb = NSPasteboard.general
         pb.clearContents()
         pb.setString(text, forType: .string)
+        // Well-behaved clipboard managers skip items marked concealed or transient.
+        pb.setString("", forType: NSPasteboard.PasteboardType("org.nspasteboard.ConcealedType"))
+        pb.setString("", forType: NSPasteboard.PasteboardType("org.nspasteboard.TransientType"))
         let count = pb.changeCount
         DispatchQueue.main.asyncAfter(deadline: .now() + 60) {
             if NSPasteboard.general.changeCount == count { NSPasteboard.general.clearContents() }

@@ -80,14 +80,17 @@ public struct PairingPayload: Equatable, Sendable {
 
 /// Line-based edits of flat top-level keys. Comments, ordering and every other key are left alone.
 public enum ConfigEdit {
+    public enum EditError: Error, Equatable { case invalidValue }
+
     public static func set(_ key: String, to value: String, in url: URL) throws {
+        guard !value.contains("\n"), !value.contains("\r") else { throw EditError.invalidValue }
         var lines = read(url)
         let line = "\(key): \(value)"
         if let first = lines.firstIndex(where: { $0.hasPrefix(key + ":") }) {
-            lines[first] = line
+            lines.replaceSubrange(first..<blockEnd(lines, after: first), with: [line])
             var i = lines.count - 1
-            while i > first {  // drop duplicates of the same key
-                if lines[i].hasPrefix(key + ":") { lines.remove(at: i) }
+            while i > first {  // drop duplicates of the same key, with their block lines
+                if lines[i].hasPrefix(key + ":") { lines.removeSubrange(i..<blockEnd(lines, after: i)) }
                 i -= 1
             }
         } else {
@@ -97,7 +100,24 @@ public enum ConfigEdit {
     }
 
     public static func remove(_ key: String, in url: URL) throws {
-        try write(read(url).filter { !$0.hasPrefix(key + ":") }, to: url)
+        var lines = read(url)
+        var i = lines.count - 1
+        while i >= 0 {
+            if lines[i].hasPrefix(key + ":") { lines.removeSubrange(i..<blockEnd(lines, after: i)) }
+            i -= 1
+        }
+        try write(lines, to: url)
+    }
+
+    /// End (exclusive) of the key at `index`: the key line plus the indented or `- item` lines
+    /// that follow it, so a block-style list (`allowed_hosts:` then `  - host`) goes as one unit.
+    private static func blockEnd(_ lines: [String], after index: Int) -> Int {
+        var end = index + 1
+        while end < lines.count {
+            let l = lines[end]
+            if l.hasPrefix(" ") || l.hasPrefix("\t") || l.hasPrefix("- ") || l == "-" { end += 1 } else { break }
+        }
+        return end
     }
 
     private static func read(_ url: URL) -> [String] {
@@ -140,6 +160,7 @@ public enum RemoteAccessError: Error, Equatable, CustomStringConvertible {
     case tailscaleMissing
     case tailscaleNotRunning
     case noMagicDNSName
+    case invalidName
     case certificateFailed(String)
     case notEnabled
 
@@ -148,6 +169,7 @@ public enum RemoteAccessError: Error, Equatable, CustomStringConvertible {
         case .tailscaleMissing: return "Tailscale is not installed. Remote access works over Tailscale only."
         case .tailscaleNotRunning: return "Tailscale is not connected. Open Tailscale, sign in, then try again."
         case .noMagicDNSName: return "This Mac has no Tailscale name. Turn on MagicDNS in the Tailscale admin console."
+        case .invalidName: return "Tailscale reported a machine name that is not a valid host name."
         case .certificateFailed(let why):
             return "Tailscale could not issue an HTTPS certificate: \(why). Turn on HTTPS certificates for your tailnet."
         case .notEnabled: return "Remote access is off."
@@ -218,6 +240,13 @@ public struct RemoteAccess: Sendable {
     /// Tailscale certificates last 90 days and are not renewed on their own.
     public static let renewAfter: TimeInterval = 60 * 24 * 3600
 
+    /// Letters, digits, dots and hyphens only, not starting with a hyphen. The name goes into
+    /// mira.yaml and onto the `tailscale cert` command line, so nothing else is accepted.
+    static func isValidHostName(_ name: String) -> Bool {
+        guard !name.isEmpty, name.count <= 253, !name.hasPrefix("-"), !name.hasPrefix(".") else { return false }
+        return name.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "." || $0 == "-") }
+    }
+
     public var token: String? { ConfigFile.value("auth_token", in: paths.configFile) }
 
     public var host: String? {
@@ -241,6 +270,7 @@ public struct RemoteAccess: Sendable {
         let status = try await tailscale.status()
         guard status.running else { throw RemoteAccessError.tailscaleNotRunning }
         guard let name = status.dnsName else { throw RemoteAccessError.noMagicDNSName }
+        guard Self.isValidHostName(name) else { throw RemoteAccessError.invalidName }
         try await issueCertificate(host: name, using: tailscale)
         let tokenValue = try token ?? PairingToken.generate()  // an existing token is kept, not replaced
         try ConfigEdit.set("auth_token", to: tokenValue, in: paths.configFile)
@@ -259,11 +289,37 @@ public struct RemoteAccess: Sendable {
         try ConfigEdit.set("auth_token", to: try PairingToken.generate(), in: paths.configFile)
     }
 
+    /// Renew when fewer than 30 days remain on the certificate itself (read with the system
+    /// `openssl`). If the date cannot be read, fall back to the file's age.
     public func certificateNeedsRenewal(now: Date = Date()) -> Bool {
-        guard isEnabled,
-              let modified = try? FileManager.default.attributesOfItem(atPath: paths.certFile.path)[.modificationDate] as? Date
+        guard isEnabled else { return false }
+        if let expiry = Self.certificateExpiry(at: paths.certFile.path) {
+            return expiry.timeIntervalSince(now) < Self.renewBefore
+        }
+        guard let modified = try? FileManager.default.attributesOfItem(atPath: paths.certFile.path)[.modificationDate] as? Date
         else { return false }
         return now.timeIntervalSince(modified) > Self.renewAfter
+    }
+
+    public static let renewBefore: TimeInterval = 30 * 24 * 3600
+
+    /// `notAfter` of a PEM certificate, or nil if it cannot be read.
+    public static func certificateExpiry(at path: String) -> Date? {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/usr/bin/openssl")
+        p.arguments = ["x509", "-noout", "-enddate", "-in", path]
+        let pipe = Pipe()
+        p.standardOutput = pipe
+        p.standardError = Pipe()
+        do { try p.run() } catch { return nil }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        p.waitUntilExit()
+        guard p.terminationStatus == 0, let text = String(data: data, encoding: .utf8) else { return nil }
+        let value = text.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "notAfter=", with: "")
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "MMM d HH:mm:ss yyyy zzz"
+        return f.date(from: value.replacingOccurrences(of: "  ", with: " "))
     }
 
     public func renewCertificate(using tailscale: TailscaleCLI) async throws {

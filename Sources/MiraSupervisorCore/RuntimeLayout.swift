@@ -99,7 +99,10 @@ public struct RuntimeLayout: Equatable, Sendable {
            FileManager.default.fileExists(atPath: paths.keyFile.path),
            ConfigFile.value("auth_token", in: paths.configFile) != nil {
             env["SSL_CERTFILE"] = paths.certFile.path
-            env["SSL_KEYFILE"] = paths.keyFile.path
+            env["SSL_KEYFILE"] = paths.keyFile.path        } else {
+            // Remote access is off: a stale value inherited from the environment must not turn HTTPS on.
+            env.removeValue(forKey: "SSL_CERTFILE")
+            env.removeValue(forKey: "SSL_KEYFILE")
         }
         if paths.isIsolated {  // keep the child, and its Hugging Face cache, out of the real home too
             env["HOME"] = paths.home.path
