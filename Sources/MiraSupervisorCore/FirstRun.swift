@@ -98,7 +98,7 @@ public enum SetupState: Equatable, Sendable {
 
     public static func defaultHFHub() -> URL {
         if let hf = ProcessInfo.processInfo.environment["HF_HOME"] { return URL(fileURLWithPath: hf).appendingPathComponent("hub") }
-        return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".cache/huggingface/hub")
+        return AppPaths.userHome.appendingPathComponent(".cache/huggingface/hub")
     }
 }
 

@@ -157,7 +157,7 @@ final class AppModel: ObservableObject {
     // MARK: - setup
 
     func showSetup() {
-        preflight = Preflight.currentMachine(freeAt: FileManager.default.homeDirectoryForCurrentUser)
+        preflight = Preflight.currentMachine(freeAt: AppPaths.userHome)
         if setupWindow == nil { setupWindow = SetupWindowController(model: self) }
         setupWindow?.show()
     }

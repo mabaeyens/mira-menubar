@@ -202,3 +202,32 @@ final class RuntimeLayoutTests: XCTestCase {
         XCTAssertFalse(l.isUsable)
     }
 }
+
+final class IsolatedHomeTests: XCTestCase {
+    func testStandardPathsFollowTheGivenHome() {
+        let home = URL(fileURLWithPath: "/tmp/iso-home", isDirectory: true)
+        let p = AppPaths.standard(home: home)
+        XCTAssertEqual(p.appSupport.path, "/tmp/iso-home/Library/Application Support/Mira")
+        XCTAssertEqual(p.dataDir.path, "/tmp/iso-home/.local/share/mira")
+        XCTAssertEqual(p.serverLog.path, "/tmp/iso-home/Library/Application Support/Mira/logs/server.log")
+        XCTAssertTrue(p.isIsolated)
+    }
+
+    func testAnIsolatedRunMovesTheChildOutOfTheRealHome() {
+        let layout = RuntimeLayout(python: "/p/python", pythonHome: nil, pythonPath: [], coreDir: "/c")
+        let iso = AppPaths.standard(home: URL(fileURLWithPath: "/tmp/iso-home"))
+        let env = layout.serverSpec(paths: iso, base: ["HOME": "/Users/real"]).environment
+        XCTAssertEqual(env["HOME"], "/tmp/iso-home")
+        XCTAssertEqual(env["HF_HOME"], "/tmp/iso-home/.cache/huggingface")
+        XCTAssertEqual(env["MIRA_CONFIG"], "/tmp/iso-home/Library/Application Support/Mira/mira.yaml")
+    }
+
+    func testTheNormalRunLeavesTheEnvironmentAlone() {
+        let layout = RuntimeLayout(python: "/p/python", pythonHome: nil, pythonPath: [], coreDir: "/c")
+        let real = AppPaths.standard(home: FileManager.default.homeDirectoryForCurrentUser)
+        let env = layout.serverSpec(paths: real, base: ["HOME": "/Users/real"]).environment
+        XCTAssertEqual(env["HOME"], "/Users/real")
+        XCTAssertNil(env["HF_HOME"])
+        XCTAssertFalse(real.isIsolated)
+    }
+}
