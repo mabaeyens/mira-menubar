@@ -34,6 +34,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             signalSources.append(src)
         }
         Task { @MainActor in AppModel.shared.launch() }
+        Task { @MainActor in UpdateController.shared.start() }
     }
 
     /// Stop the server we started (and its engine) before exiting, so quitting never leaves a

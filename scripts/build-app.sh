@@ -32,6 +32,13 @@ echo "==> menu-bar executable"
 BIN="$(cd "$HERE" && swift build -c release --arch arm64 --show-bin-path)/MiraMenuBar"
 cp "$BIN" "$APP/Contents/MacOS/Mira"
 
+echo "==> Sparkle framework"
+SPARKLE_FW="$(cd "$HERE" && find .build/artifacts/sparkle -type d -name Sparkle.framework -path '*macos-arm64_x86_64*' | head -1)"
+[ -n "$SPARKLE_FW" ] || { echo "Sparkle.framework not found (run: swift build -c release)" >&2; exit 1; }
+mkdir -p "$APP/Contents/Frameworks"
+ditto "$HERE/$SPARKLE_FW" "$APP/Contents/Frameworks/Sparkle.framework"
+install_name_tool -add_rpath "@executable_path/../Frameworks" "$APP/Contents/MacOS/Mira"
+
 echo "==> Python runtime"
 PYBIN="$(uv python find 3.13)"
 # Resolve links: the bundle must hold real files, never a link back into ~/.local/share/uv.
@@ -70,6 +77,10 @@ cat > "$APP/Contents/Info.plist" <<EOF
 <key>LSMinimumSystemVersion</key><string>14.0</string>
 <key>LSUIElement</key><true/>
 <key>NSHumanReadableCopyright</key><string>Mira</string>
+<key>SUFeedURL</key><string>https://github.com/mabaeyens/mira-menubar/releases/latest/download/appcast.xml</string>
+<key>SUPublicEDKey</key><string>WIo+Hk2ecttjNkA1SZW3xnEzNXzbcC1RvSFvUptMGZI=</string>
+<key>SUEnableAutomaticChecks</key><true/>
+<key>SUAutomaticallyUpdate</key><false/>
 </dict></plist>
 EOF
 

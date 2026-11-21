@@ -47,6 +47,9 @@ struct MenuContent: View {
         Divider()
         Toggle("Open at Login", isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
         Button("Show Logs") { model.revealLogs() }
+        if UpdateController.shared.isAvailable {
+            Button("Check for Updates…") { UpdateController.shared.checkForUpdates() }
+        }
         Divider()
         Button("Quit Mira") { NSApp.terminate(nil) }
             .keyboardShortcut("q")

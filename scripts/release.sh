@@ -32,6 +32,11 @@ MACHO="$OUT/macho.txt"
 find "$APP" -type f -exec file {} + 2>/dev/null | grep 'Mach-O' | cut -d: -f1 | sed 's/ (for architecture .*)$//' | grep -v '/Contents/MacOS/Mira$' | sort -u > "$MACHO"
 echo "    $(wc -l < "$MACHO" | tr -d ' ') nested Mach-O files"
 xargs -P 8 -I{} codesign --force --options runtime --timestamp --sign "$ID" {} < "$MACHO" 2>/dev/null
+# Sparkle's nested bundles, innermost first (their executables were signed above).
+SPK="$APP/Contents/Frameworks/Sparkle.framework/Versions/B"
+for b in "$SPK"/XPCServices/*.xpc "$SPK/Updater.app" "$APP/Contents/Frameworks/Sparkle.framework"; do
+  [ -e "$b" ] && codesign --force --options runtime --timestamp --sign "$ID" "$b"
+done
 codesign --force --options runtime --timestamp --sign "$ID" "$APP/Contents/MacOS/Mira"
 codesign --force --options runtime --timestamp --sign "$ID" "$APP"
 codesign --verify --strict --verbose=1 "$APP"
