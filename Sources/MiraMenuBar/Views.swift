@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import CoreImage.CIFilterBuiltins
 import MiraSupervisorCore
 
 struct MenuContent: View {
@@ -141,6 +142,10 @@ struct PairingView: View {
                         .font(.system(.body, design: .monospaced))
                     Button(reveal ? "Hide" : "Show") { reveal.toggle() }.buttonStyle(.link)
                 }
+                if reveal, let image = QRCode.image(for: payload.link) {
+                    Image(nsImage: image).interpolation(.none).resizable().frame(width: 200, height: 200)
+                    Text("Scan with Mira on the iPhone (Add connection, Scan QR).").font(.footnote).foregroundStyle(.secondary)
+                }
                 Text("On the iPhone, open Mira, add a connection, and paste the link. The token is cleared from the clipboard after a minute.")
                     .font(.callout).foregroundStyle(.secondary)
                 HStack {
@@ -189,5 +194,19 @@ final class PairingWindowController {
         NSApp.activate(ignoringOtherApps: true)
         window?.center()
         window?.makeKeyAndOrderFront(nil)
+    }
+}
+
+enum QRCode {
+    /// A crisp QR image for `text`, or nil if it cannot be encoded.
+    static func image(for text: String) -> NSImage? {
+        let filter = CIFilter.qrCodeGenerator()
+        filter.message = Data(text.utf8)
+        filter.correctionLevel = "M"
+        guard let out = filter.outputImage?.transformed(by: CGAffineTransform(scaleX: 8, y: 8)) else { return nil }
+        let rep = NSCIImageRep(ciImage: out)
+        let img = NSImage(size: rep.size)
+        img.addRepresentation(rep)
+        return img
     }
 }
