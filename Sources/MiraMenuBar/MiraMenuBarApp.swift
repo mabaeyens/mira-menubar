@@ -11,7 +11,11 @@ struct MiraMenuBarApp: App {
         MenuBarExtra {
             MenuContent(model: model)
         } label: {
-            Image(systemName: model.status.symbol)
+            if model.status.kind == .failed {
+                Image(systemName: model.status.symbol)
+            } else {
+                Image(nsImage: Sparks.image(alpha: Sparks.alpha(for: model.status.kind)))
+            }
         }
     }
 }

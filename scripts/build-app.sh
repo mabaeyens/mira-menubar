@@ -53,6 +53,8 @@ echo "==> mira-core source (HEAD, tracked files only)"
 mkdir -p "$R/mira-core"
 git -C "$CORE" archive HEAD | tar -x -C "$R/mira-core"
 
+cp "$HERE/Resources/AppIcon.icns" "$R/AppIcon.icns"
+
 cat > "$APP/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -61,6 +63,7 @@ cat > "$APP/Contents/Info.plist" <<EOF
 <key>CFBundleName</key><string>Mira</string>
 <key>CFBundleDisplayName</key><string>Mira</string>
 <key>CFBundleExecutable</key><string>Mira</string>
+<key>CFBundleIconFile</key><string>AppIcon</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>$VERSION</string>
 <key>CFBundleVersion</key><string>$VERSION</string>
