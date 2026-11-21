@@ -81,11 +81,21 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// Stop what we started. Does nothing to a server started elsewhere.
-    func shutdown() async {
+    /// Stop what we started. Does nothing to a server started elsewhere. Blocks the calling
+    /// (main) thread until the process group is gone, or the timeout passes. It must not rely
+    /// on a main-actor task to finish: while AppKit is inside `terminate:` it runs its own
+    /// run loop mode, and a pending main-actor task never gets to run (found by launching the
+    /// notarized build and sending it SIGTERM: it hung forever).
+    func shutdownBlocking(timeout: TimeInterval = 20) {
         pollTask?.cancel()
         setupTask?.cancel()
-        await supervisor?.stop()
+        guard let sup = supervisor else { return }
+        let done = DispatchSemaphore(value: 0)
+        Task.detached {
+            await sup.stop()
+            done.signal()
+        }
+        _ = done.wait(timeout: .now() + timeout)
     }
 
     var ownsServer: Bool {
